@@ -1,38 +1,49 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { MAX_BOWLS, MAX_DRINK_QTY } from './pricing.ts';
+import { MAX_DRINK_QTY } from './pricing.ts';
 import { emptyExtras, type BaseId, type Bowl, type ExtraId, type Menu, type OrderDraft, type ServiceMode } from './types.ts';
 
-export type Stage = 'build' | 'checkout' | 'placed';
+/** build → finished (plated or boxed) → placed (server confirmed). Any edit drops back to build. */
+export type Phase = 'build' | 'finished' | 'placed';
 
 export interface PlacedOrder {
   id: string;
   total: number;
   currency: string;
   mode: ServiceMode;
+  name: string;
   /** Server total differed from what the customer saw (menu changed meanwhile). */
   priceChanged?: boolean;
+}
+
+export type LastAdded = { kind: 'base' | 'extra' | 'drink' | 'mode'; id: string } | null;
+
+/** One-time coach marks, like the reference's handwritten hints; each hides once the customer has done it. */
+export interface Hints {
+  leg: boolean;
+  spoon: boolean;
+  drag: boolean;
 }
 
 export interface OrderState {
   /** The bowl on screen. Rice-only (base null) until a chaofan is chosen. */
   current: Bowl;
-  /** Finished bowls the customer has set aside with "Add another bowl". */
-  saved: Bowl[];
   drinks: Record<string, number>;
   mode: ServiceMode;
-  stage: Stage;
+  phase: Phase;
   placed: PlacedOrder | null;
+  lastAdded: LastAdded;
+  hintsDone: Hints;
+  /** Bumped by "Start over" so the scene replays the rice warming up. */
+  resetCount: number;
 
   setBase: (base: BaseId | null) => void;
   setExtra: (id: ExtraId, qty: number, max: number) => void;
   setDrink: (id: string, qty: number) => void;
   setMode: (mode: ServiceMode) => void;
-  saveAndStartNew: () => void;
-  editSaved: (index: number) => void;
-  removeSaved: (index: number) => void;
-  setStage: (stage: Stage) => void;
+  finish: () => void;
   markPlaced: (order: PlacedOrder) => void;
+  doneHint: (hint: keyof Hints) => void;
   startOver: () => void;
   /** Drops selections the current menu can no longer price (e.g. a removed drink). */
   reconcile: (menu: Menu) => void;
@@ -41,57 +52,69 @@ export interface OrderState {
 const riceOnly = (): Bowl => ({ base: null, extras: emptyExtras() });
 const clamp = (n: number, max: number) => Math.max(0, Math.min(max, Math.round(n)));
 
-export const selectDraft = (s: Pick<OrderState, 'current' | 'saved' | 'drinks' | 'mode'>): OrderDraft => ({
-  bowls: s.current.base ? [...s.saved, s.current] : s.saved,
+export const selectDraft = (s: Pick<OrderState, 'current' | 'drinks' | 'mode'>): OrderDraft => ({
+  bowls: s.current.base ? [s.current] : [],
   drinks: Object.fromEntries(Object.entries(s.drinks).filter(([, q]) => q > 0)),
   mode: s.mode,
 });
 
+/** Edits after the bowl was finished re-open it; a placed order is frozen until "Start over". */
+const editable = (s: OrderState) => s.phase !== 'placed';
+
 export const useOrder = create<OrderState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       current: riceOnly(),
-      saved: [],
       drinks: {},
       mode: 'dine-in',
-      stage: 'build',
+      phase: 'build',
       placed: null,
+      lastAdded: null,
+      hintsDone: { leg: false, spoon: false, drag: false },
+      resetCount: 0,
 
-      setBase: (base) => set((s) => ({ current: { ...s.current, base } })),
-      setExtra: (id, qty, max) => set((s) => ({ current: { ...s.current, extras: { ...s.current.extras, [id]: clamp(qty, max) } } })),
-      setDrink: (id, qty) => set((s) => ({ drinks: { ...s.drinks, [id]: clamp(qty, MAX_DRINK_QTY) } })),
-      setMode: (mode) => set({ mode }),
-      saveAndStartNew: () => {
-        const { current, saved } = get();
-        if (!current.base || saved.length + 1 >= MAX_BOWLS) return;
-        set({ saved: [...saved, current], current: riceOnly() });
-      },
-      editSaved: (index) =>
+      setBase: (base) =>
         set((s) => {
-          const target = s.saved[index];
-          if (!target) return s;
-          const rest = s.saved.filter((_, i) => i !== index);
-          // the bowl being edited swaps places with whatever is on screen
-          return { current: target, saved: s.current.base ? [...rest, s.current] : rest, stage: 'build' };
+          if (!editable(s)) return s;
+          // extras only make sense on a chaofan, so going back to plain rice clears them
+          const current = base ? { ...s.current, base } : riceOnly();
+          return { current, phase: 'build', lastAdded: base ? { kind: 'base', id: base } : null };
         }),
-      removeSaved: (index) => set((s) => ({ saved: s.saved.filter((_, i) => i !== index) })),
-      setStage: (stage) => set({ stage }),
-      markPlaced: (placed) => set({ placed, stage: 'placed' }),
-      startOver: () => set({ current: riceOnly(), saved: [], drinks: {}, stage: 'build', placed: null }),
+      setExtra: (id, qty, max) =>
+        set((s) => {
+          if (!editable(s) || !s.current.base) return s;
+          const next = clamp(qty, max);
+          const prev = s.current.extras[id];
+          if (next === prev) return s;
+          return {
+            current: { ...s.current, extras: { ...s.current.extras, [id]: next } },
+            phase: 'build',
+            lastAdded: next > prev ? { kind: 'extra', id } : s.lastAdded,
+          };
+        }),
+      setDrink: (id, qty) =>
+        set((s) => {
+          if (!editable(s)) return s;
+          const next = clamp(qty, MAX_DRINK_QTY);
+          const prev = s.drinks[id] ?? 0;
+          return { drinks: { ...s.drinks, [id]: next }, phase: 'build', lastAdded: next > prev ? { kind: 'drink', id } : s.lastAdded };
+        }),
+      setMode: (mode) => set((s) => (editable(s) && s.mode !== mode ? { mode, phase: 'build', lastAdded: { kind: 'mode', id: mode } } : s)),
+      finish: () => set((s) => (s.current.base && s.phase === 'build' ? { phase: 'finished' } : s)),
+      markPlaced: (placed) => set({ placed, phase: 'placed' }),
+      doneHint: (hint) => set((s) => (s.hintsDone[hint] ? s : { hintsDone: { ...s.hintsDone, [hint]: true } })),
+      startOver: () => set((s) => ({ current: riceOnly(), drinks: {}, phase: 'build', placed: null, lastAdded: null, resetCount: s.resetCount + 1 })),
       reconcile: (menu) =>
         set((s) => {
           const drinks = Object.fromEntries(Object.entries(s.drinks).filter(([id, q]) => q > 0 && menu.drinks.some((d) => d.id === id && d.price !== null)));
-          const fix = (b: Bowl): Bowl => ({
-            base: b.base,
-            extras: Object.fromEntries(menu.extras.map((e) => [e.id, clamp(b.extras[e.id] ?? 0, e.max)])) as Bowl['extras'],
-          });
-          return { drinks, current: fix(s.current), saved: s.saved.map(fix) };
+          const extras = Object.fromEntries(menu.extras.map((e) => [e.id, clamp(s.current.extras[e.id] ?? 0, e.max)])) as Bowl['extras'];
+          return { drinks, current: { base: s.current.base, extras } };
         }),
     }),
     {
-      name: 'chaofan-order-v1',
+      name: 'chaofan-order-v2',
       storage: createJSONStorage(() => sessionStorage),
-      partialize: (s) => ({ current: s.current, saved: s.saved, drinks: s.drinks, mode: s.mode, stage: s.stage, placed: s.placed }),
+      partialize: (s) => ({ current: s.current, drinks: s.drinks, mode: s.mode, phase: s.phase, placed: s.placed, hintsDone: s.hintsDone }),
     },
   ),
 );

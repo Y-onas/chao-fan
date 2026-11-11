@@ -56,12 +56,12 @@ export function validateMenu(input: unknown): { menu?: Menu; error?: string } {
     }),
     extras: EXTRA_IDS.map((id) => {
       const e = extras.find((x) => isObj(x) && x.id === id) as Record<string, unknown>;
-      return { id, name: str(e.name, 60) || id, price: e.price as number, max: e.max as number };
+      return { id, name: str(e.name, 60) || id, price: e.price as number, max: e.max as number, description: str(e.description, 200) };
     }),
     packaging: { takeawayBox: packaging.takeawayBox as number },
     drinks: drinks.map((d) => {
       const r = d as Record<string, unknown>;
-      return { id: r.id as string, name: str(r.name, 60), price: r.price as number | null, color: r.color as string };
+      return { id: r.id as string, name: str(r.name, 60), price: r.price as number | null, color: r.color as string, description: str(r.description, 200) };
     }),
   };
   return { menu };
