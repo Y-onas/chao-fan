@@ -4,7 +4,7 @@ import { priceOrder } from '../src/order/pricing.ts';
 import { emptyExtras, type Menu, type OrderDraft } from '../src/order/types.ts';
 
 const menu = menuJson as Menu;
-const withDrinkPrices: Menu = { ...menu, drinks: menu.drinks.map((d) => ({ ...d, price: d.id === 'juice' ? 120 : d.price })) };
+const withDrinkPrices: Menu = { ...menu, drinks: menu.drinks.map((d) => ({ ...d, price: d.id === 'mojito' ? 120 : d.price })) };
 
 const draft = (over: Partial<OrderDraft> = {}): OrderDraft => ({
   bowls: [{ base: 'chicken', extras: emptyExtras() }],
