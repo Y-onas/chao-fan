@@ -8,62 +8,131 @@ function canvas(w: number, h: number) {
   return [c, c.getContext('2d')!] as const;
 }
 
-/** White marble with warm veins, after the restaurant's table tops. */
-export function marbleTexture() {
-  const [c, g] = canvas(1024, 1024);
-  g.fillStyle = '#d9d3cb';
-  g.fillRect(0, 0, 1024, 1024);
-  const rand = rng(11);
-  for (let i = 0; i < 26; i++) {
-    const warm = rand() < 0.35;
-    g.strokeStyle = warm ? `rgba(176,112,52,${0.25 + rand() * 0.35})` : `rgba(120,118,122,${0.08 + rand() * 0.22})`;
-    g.lineWidth = warm ? 1 + rand() * 2.5 : 2 + rand() * 9;
-    g.filter = warm ? 'blur(0.6px)' : 'blur(3px)';
-    let x = rand() * 1024;
-    let y = rand() * 1024;
-    g.beginPath();
-    g.moveTo(x, y);
-    const dir = rand() * Math.PI * 2;
-    for (let s = 0; s < 40; s++) {
-      x += Math.cos(dir + Math.sin(s * 0.4 + i) * 0.9) * 22;
-      y += Math.sin(dir + Math.sin(s * 0.4 + i) * 0.9) * 22;
-      g.lineTo(x, y);
-    }
-    g.stroke();
-  }
+function colorTex(c: HTMLCanvasElement) {
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
-  t.wrapS = t.wrapT = RepeatWrapping;
-  t.repeat.set(3, 3);
   t.anisotropy = 8;
   return t;
 }
 
-export function stickerTexture(line2: string) {
-  const [c, g] = canvas(512, 256);
-  g.fillStyle = '#fff8ec';
+/** Smooth 2D value noise on a wrapping grid, enough for wood figure. */
+function valueNoise(seed: number, cells: number) {
+  const rand = rng(seed);
+  const grid = Array.from({ length: cells * cells }, rand);
+  const at = (x: number, y: number) => grid[(((y % cells) + cells) % cells) * cells + (((x % cells) + cells) % cells)];
+  const s = (t: number) => t * t * (3 - 2 * t);
+  return (x: number, y: number) => {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const fx = s(x - xi);
+    const fy = s(y - yi);
+    const a = at(xi, yi) + (at(xi + 1, yi) - at(xi, yi)) * fx;
+    const b = at(xi, yi + 1) + (at(xi + 1, yi + 1) - at(xi, yi + 1)) * fx;
+    return a + (b - a) * fy;
+  };
+}
+
+/** Olive-wood serving board: honey base with wavy dark figure, like the reference's prep board. */
+export function oliveWoodTexture() {
+  const N = 1024;
+  const [c, g] = canvas(N, N);
+  const img = g.createImageData(N, N);
+  const n1 = valueNoise(3, 8);
+  const n2 = valueNoise(4, 32);
+  const n3 = valueNoise(5, 128);
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const u = x / N;
+      const v = y / N;
+      // long, gently waving grain lines (stretched along u) with a few darker olive figure bands
+      const warp = n1(u * 3, v * 8) * 1.6 + n2(u * 8, v * 32) * 0.18;
+      const fine = Math.sin((v * 70 + warp * 9) * Math.PI * 2) * 0.5 + 0.5;
+      const broad = Math.sin((v * 6 + warp) * Math.PI * 2);
+      const figure = Math.pow(Math.max(0, broad), 10) * 0.55;
+      const fleck = (n3(u * 128, v * 128) - 0.5) * 0.06;
+      const k = Math.min(1, figure + Math.pow(fine, 6) * 0.22 + fleck + 0.08);
+      const i = (y * N + x) * 4;
+      // honey (#c4925c) toward dark olive figure (#5c3a1e)
+      img.data[i] = 196 - (196 - 92) * k;
+      img.data[i + 1] = 146 - (146 - 58) * k;
+      img.data[i + 2] = 92 - (92 - 30) * k;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return colorTex(c);
+}
+
+/** Round red order stamp, pressed onto the finished meal once the server confirms the order. */
+export function stampTexture(orderId: string) {
+  const [c, g] = canvas(512, 512);
+  g.fillStyle = '#d42a2a';
   g.beginPath();
-  g.roundRect(4, 4, 504, 248, 40);
+  g.arc(256, 256, 248, 0, Math.PI * 2);
   g.fill();
-  g.fillStyle = '#e4572e';
+  g.strokeStyle = 'rgba(255,240,230,0.85)';
+  g.lineWidth = 6;
+  g.setLineDash([14, 10]);
   g.beginPath();
-  g.arc(110, 128, 78, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = '#fff8ec';
-  g.font = 'bold 64px system-ui, sans-serif';
+  g.arc(256, 256, 214, 0, Math.PI * 2);
+  g.stroke();
+  g.fillStyle = '#fff4ea';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillText('CF', 110, 132);
-  g.fillStyle = '#2b1a10';
-  g.textAlign = 'left';
-  g.font = 'bold 46px system-ui, sans-serif';
-  g.fillText('ChaoFan', 210, 96);
-  g.fillText('Corner', 210, 146);
-  g.font = '28px system-ui, sans-serif';
-  g.fillStyle = '#7a5a40';
-  g.fillText(line2, 212, 200);
-  const t = new CanvasTexture(c);
-  t.colorSpace = SRGBColorSpace;
+  g.font = 'italic 76px "Instrument Serif", Georgia, serif';
+  g.fillText('ChaoFan', 256, 190);
+  g.font = '800 44px "Bricolage Grotesque", system-ui, sans-serif';
+  g.fillText('CORNER', 256, 256);
+  g.font = '600 38px "Bricolage Grotesque", system-ui, sans-serif';
+  g.fillText(`Nº ${orderId}`, 256, 330);
+  return colorTex(c);
+}
+
+/** Little kraft tag with the customer's name in handwriting. */
+export function nameTagTexture(name: string) {
+  const [c, g] = canvas(512, 256);
+  g.fillStyle = '#f4e6cc';
+  g.beginPath();
+  g.roundRect(8, 8, 496, 240, 24);
+  g.fill();
+  g.fillStyle = '#d9c7a6';
+  g.beginPath();
+  g.arc(60, 128, 16, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#b8261f';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = '600 92px Caveat, cursive';
+  g.fillText(`for ${name}`.slice(0, 18), 284, 128, 400);
+  return colorTex(c);
+}
+
+/** Wrap-around can artwork: brand colour, white name, condensation speckle. */
+export function canTexture(name: string, color: string) {
+  const [c, g] = canvas(1024, 512);
+  g.fillStyle = color;
+  g.fillRect(0, 0, 1024, 512);
+  g.fillStyle = 'rgba(255,255,255,0.92)';
+  g.beginPath();
+  g.moveTo(0, 360);
+  g.bezierCurveTo(260, 300, 520, 430, 1024, 340);
+  g.lineTo(1024, 372);
+  g.bezierCurveTo(520, 460, 260, 330, 0, 392);
+  g.fill();
+  g.font = 'italic 700 150px Georgia, serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(name, 256, 220, 460);
+  g.fillText(name, 768, 220, 460);
+  const rand = rng(name.length * 7);
+  for (let i = 0; i < 900; i++) {
+    g.fillStyle = `rgba(255,255,255,${0.08 + rand() * 0.18})`;
+    g.beginPath();
+    g.arc(rand() * 1024, rand() * 512, 0.6 + rand() * 2.2, 0, Math.PI * 2);
+    g.fill();
+  }
+  const t = colorTex(c);
+  t.wrapS = RepeatWrapping;
   return t;
 }
 
@@ -77,8 +146,7 @@ export function kraftTexture() {
     g.fillStyle = rand() < 0.5 ? 'rgba(90,58,28,0.18)' : 'rgba(235,205,160,0.2)';
     g.fillRect(rand() * 512, rand() * 512, 1 + rand() * 6, 1);
   }
-  const t = new CanvasTexture(c);
-  t.colorSpace = SRGBColorSpace;
+  const t = colorTex(c);
   t.wrapS = t.wrapT = RepeatWrapping;
   return t;
 }
