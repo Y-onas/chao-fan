@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
-import type { Bowl, MenuDrink, ServiceMode } from '../order/types.ts';
+import type { FoodSceneProps } from '../scene/FoodScene.tsx';
 import { Fallback2D } from './Fallback2D.tsx';
 
 const FoodScene = lazy(() => import('../scene/FoodScene.tsx'));
@@ -39,51 +39,31 @@ class SceneBoundary extends Component<{ onError: () => void; children: ReactNode
   }
 }
 
-interface StageProps {
-  bowl: Bowl;
-  mode: ServiceMode;
-  finished: boolean;
-  drinks: Record<string, number>;
-  menuDrinks: MenuDrink[];
-  stickerLine: string;
-}
+export type StageProps = Omit<FoodSceneProps, 'reducedMotion' | 'onReady'>;
 
+/** The food stage: live 3D when possible, a simplified photo preview otherwise (never presented as 3D). */
 export function Stage(props: StageProps) {
   const reducedMotion = usePrefersReducedMotion();
-  const [view, setView] = useState<'3d' | '2d'>(() => (hasWebGL() ? '3d' : '2d'));
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState(() => !hasWebGL());
   const [ready, setReady] = useState(false);
   const onReady = useCallback(() => setReady(true), []);
-  const onError = useCallback(() => {
-    setFailed(true);
-    setView('2d');
-  }, []);
-  const show3d = view === '3d' && !failed;
+  const onError = useCallback(() => setFailed(true), []);
 
   return (
-    <div className={`stage ${props.finished ? 'finished' : ''}`} data-view={show3d ? '3d' : '2d'}>
-      {show3d ? (
+    <div className="stage" data-view={failed ? '2d' : '3d'} data-drop-target>
+      {failed ? (
+        <>
+          <Fallback2D bowl={props.bowl} mode={props.mode} finished={props.phase !== 'build'} drinks={props.drinks} menuDrinks={props.menuDrinks} />
+          <span className="stage-note">Simplified photo preview — 3D isn’t available on this device</span>
+        </>
+      ) : (
         <SceneBoundary onError={onError}>
           <Suspense fallback={null}>
             <FoodScene {...props} reducedMotion={reducedMotion} onReady={onReady} />
           </Suspense>
         </SceneBoundary>
-      ) : (
-        <Fallback2D {...props} />
       )}
-      {show3d && !ready && <div className="stage-loading">Plating up…</div>}
-      <div className="stage-tools">
-        {failed ? (
-          <span className="stage-note">3D preview unavailable — showing photo preview</span>
-        ) : (
-          hasWebGL() && (
-            <button type="button" className="chip" onClick={() => setView(show3d ? '2d' : '3d')}>
-              {show3d ? 'Simple view' : '3D view'}
-            </button>
-          )
-        )}
-        {show3d && <span className="stage-hint">Drag sideways to turn the plate</span>}
-      </div>
+      {!failed && !ready && <div className="stage-loading">Setting the table…</div>}
     </div>
   );
 }

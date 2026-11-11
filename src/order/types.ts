@@ -17,6 +17,7 @@ export interface MenuExtra {
   name: string;
   price: number;
   max: number;
+  description?: string;
 }
 
 export interface MenuDrink {
@@ -25,6 +26,7 @@ export interface MenuDrink {
   /** null = the owner has not set a price yet; the drink cannot be ordered. */
   price: number | null;
   color: string;
+  description?: string;
 }
 
 export interface Menu {

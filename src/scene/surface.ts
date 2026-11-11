@@ -1,7 +1,7 @@
 /** Shared geometry of the rice mound so every topping sits on the same surface. */
 
-/** The bowl is a circular lathe stretched along X into an oval. */
-export const BOWL_STRETCH = 1.25;
+/** Kept as a knob: the restaurant bowls are round (1). */
+export const BOWL_STRETCH = 1;
 /** Radius (before stretch) where the rice meets the inner bowl wall. */
 export const RICE_EDGE_R = 1.12;
 const EDGE_Y = 0.46;
