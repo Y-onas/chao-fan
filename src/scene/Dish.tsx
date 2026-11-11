@@ -4,17 +4,44 @@ import { Color, InstancedMesh, LatheGeometry, Object3D, RepeatWrapping, RingGeom
 import palette from '../data/rice-palette.json';
 import { ASSET } from './assets.ts';
 import { BOWL_STRETCH, RICE_EDGE_R, randomOnRice, riceHeight, rng } from './surface.ts';
+import { oliveWoodTexture } from './textures.ts';
 
 const BOWL_PROFILE: [number, number][] = [
   [0.001, 0], [0.5, 0], [0.56, 0.03], [0.62, 0.08], [0.85, 0.25], [1.15, 0.45], [1.42, 0.62],
   [1.445, 0.645], [1.4, 0.658], [1.36, 0.63], [1.1, 0.44], [0.8, 0.24], [0.55, 0.11], [0.001, 0.09],
 ];
 
+/** Glazed black ceramic, as the restaurant serves its chaofan. */
 export function Bowl() {
   const geo = useMemo(() => new LatheGeometry(BOWL_PROFILE.map(([r, y]) => new Vector2(r, y)), 128), []);
   return (
     <mesh geometry={geo} scale={[BOWL_STRETCH, 1, 1]} castShadow receiveShadow>
-      <meshPhysicalMaterial color="#f8f6f1" roughness={0.22} clearcoat={0.7} clearcoatRoughness={0.12} />
+      <meshPhysicalMaterial color="#1a1918" roughness={0.3} clearcoat={0.9} clearcoatRoughness={0.18} />
+    </mesh>
+  );
+}
+
+export const BOARD_R = 2.0;
+export const BOARD_TOP = 0.12;
+const BOARD_PROFILE: [number, number][] = [
+  [0.001, 0], [BOARD_R - 0.06, 0], [BOARD_R, 0.04], [BOARD_R + 0.01, 0.12], [BOARD_R - 0.04, 0.17], [BOARD_R - 0.16, 0.15],
+  [BOARD_R - 0.24, BOARD_TOP], [0.001, BOARD_TOP],
+];
+
+/** Round olive-wood serving board with a raised lip; the bowl and finished meal sit on it. */
+export function Board() {
+  const map = useMemo(oliveWoodTexture, []);
+  const geo = useMemo(() => {
+    const g = new LatheGeometry(BOARD_PROFILE.map(([r, y]) => new Vector2(r, y)), 128);
+    // planar UVs so the grain runs straight across the board instead of around it
+    const pos = g.attributes.position;
+    const uv = g.attributes.uv;
+    for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / (BOARD_R * 2.1) + 0.5, pos.getZ(i) / (BOARD_R * 2.1) + 0.5);
+    return g;
+  }, []);
+  return (
+    <mesh geometry={geo} castShadow receiveShadow>
+      <meshPhysicalMaterial map={map} roughness={0.55} clearcoat={0.35} clearcoatRoughness={0.4} />
     </mesh>
   );
 }
@@ -92,11 +119,11 @@ export function Rice() {
   return (
     <group>
       <mesh geometry={geo} receiveShadow>
-        <meshStandardMaterial map={map} normalMap={normalMap} normalScale={new Vector2(1.4, 1.4)} roughnessMap={roughnessMap} roughness={0.9} />
+        <meshStandardMaterial map={map} emissiveMap={map} emissive="#ffffff" emissiveIntensity={0.4} normalMap={normalMap} normalScale={new Vector2(1.4, 1.4)} roughnessMap={roughnessMap} roughness={0.9} />
       </mesh>
       <instancedMesh ref={grains} args={[undefined, undefined, GRAINS.count]} castShadow receiveShadow>
         <capsuleGeometry args={[0.0105, 0.042, 2, 6]} />
-        <meshStandardMaterial roughness={0.42} />
+        <meshStandardMaterial roughness={0.42} emissive="#5a2a0a" emissiveIntensity={0.55} />
       </instancedMesh>
       <instancedMesh ref={corn} args={[undefined, undefined, CORN.count]} castShadow>
         <sphereGeometry args={[0.026, 10, 8]} />
