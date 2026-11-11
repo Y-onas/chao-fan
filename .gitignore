@@ -6,3 +6,4 @@ data/
 .hoplite/
 test-results/
 *.tsbuildinfo
+assets-src/models/

@@ -47,7 +47,7 @@ describe('order API', () => {
   it('rejects rice-only bowls, unpriced drinks and bad customer details', async () => {
     const rice = await order({ draft: { bowls: [{ base: null, extras: {} }], drinks: {}, mode: 'dine-in' }, customer });
     expect(rice.status).toBe(422);
-    const drink = await order({ draft: { bowls: [{ base: 'egg', extras: {} }], drinks: { water: 1 }, mode: 'dine-in' }, customer });
+    const drink = await order({ draft: { bowls: [{ base: 'egg', extras: {} }], drinks: { sprite: 1 }, mode: 'dine-in' }, customer });
     expect(drink.status).toBe(422);
     const phone = await order({ draft: { bowls: [{ base: 'egg', extras: {} }], drinks: {}, mode: 'dine-in' }, customer: { name: 'Abebe', phone: 'x' } });
     expect(phone.status).toBe(400);
@@ -59,7 +59,7 @@ describe('order API', () => {
     expect((await putMenu(menu, 'wrong')).status).toBe(401);
     expect((await putMenu(menu)).status).toBe(200);
     expect((await (await fetch(`${base}/api/menu`)).json()).drinks[0].price).toBe(60);
-    const res = await order({ draft: { bowls: [{ base: 'veggie', extras: {} }], drinks: { 'soft-drink': 2 }, mode: 'dine-in' }, customer });
+    const res = await order({ draft: { bowls: [{ base: 'veggie', extras: {} }], drinks: { 'coca-cola': 2 }, mode: 'dine-in' }, customer });
     expect((await res.json()).total).toBe(270 + 120);
   });
 

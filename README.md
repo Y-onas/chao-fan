@@ -2,7 +2,7 @@
 
 Online ordering for ChaoFan Corner: pick a chaofan, add extras and drinks, choose dine-in or
 takeaway, and place the order. A 3D plate updates as you build the bowl (with a 2D photo view
-for devices without WebGL or when "Simple view" is chosen).
+for devices without WebGL).
 
 Stack: React 18 + TypeScript + Vite, Three.js via React Three Fiber, Zustand, and a small
 dependency-free Node HTTP server for the order API.
@@ -36,5 +36,6 @@ them at `/#/admin`. The server re-prices every order, so totals sent by the brow
 
 ## Visual assets
 
-See [ASSETS.md](ASSETS.md) for which visuals come from the restaurant's photos, which are
-procedural stand-ins, and which production assets are still needed.
+The food is real 3D (Sketchfab photogrammetry scans, CC BY 4.0). See [ASSETS.md](ASSETS.md) for
+sources, how to rebuild the models (`npm run models`, needs a `SKETCHFAB` API token) and the rail
+pictures (`npm run tiles`), and what is still worth commissioning.
