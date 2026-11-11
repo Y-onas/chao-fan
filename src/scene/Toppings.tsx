@@ -4,11 +4,11 @@ import { Color, IcosahedronGeometry, PlaneGeometry, Quaternion, SRGBColorSpace, 
 import type { BaseId, Extras } from '../order/types.ts';
 import { ASSET } from './assets.ts';
 import { Pop } from './motion.tsx';
-import { BOWL_STRETCH, randomOnRice, riceHeight, riceNormal, rng } from './surface.ts';
+import { randomOnRice, riceHeight, riceNormal, rng } from './surface.ts';
 
 const UP = new Vector3(0, 1, 0);
 
-function useFoodTextures() {
+export function useFoodTextures() {
   const urls = [ASSET.chickenLeg, ASSET.chickenLegH, ASSET.friedEgg, ASSET.friedEggH, ASSET.sauce, ASSET.sauceH, ...ASSET.chickenPieces.flat()];
   const tex = useTexture(urls) as Texture[];
   useMemo(() => {
@@ -30,7 +30,7 @@ function flatPlane(size: number) {
 }
 
 /** Orientation that makes an object lie on the rice at (x, z), turned by `yaw`. */
-function restingQuat(x: number, z: number, yaw: number) {
+export function restingQuat(x: number, z: number, yaw: number) {
   const q = new Quaternion().setFromUnitVectors(UP, new Vector3(...riceNormal(x, z)));
   return q.multiply(new Quaternion().setFromAxisAngle(UP, yaw));
 }
@@ -45,7 +45,7 @@ interface PhotoProps {
 }
 
 /** A photographic cut-out given real relief by displacing a dense plane with its height map. */
-function PhotoFood({ map, height, size, thickness, roughness = 0.55 }: PhotoProps) {
+export function PhotoFood({ map, height, size, thickness, roughness = 0.55 }: PhotoProps) {
   return (
     <mesh geometry={flatPlane(size)} castShadow receiveShadow>
       <meshStandardMaterial
@@ -169,7 +169,7 @@ function VeggieBase({ show }: { show: boolean }) {
 
 // ------------------------------------------------------------------ extras
 
-const LEG_SLOTS = [
+export const LEG_SLOTS = [
   { x: 0.78, z: -0.12, yaw: 0.5 },
   { x: 0.2, z: -0.5, yaw: -0.3 },
 ];
@@ -179,7 +179,7 @@ const EGG_SLOTS = [
   { x: -0.95, z: -0.28, yaw: 2.6 },
 ];
 
-function SauceCup({ map, height }: { map: Texture; height: Texture }) {
+export function SauceCup({ map, height }: { map: Texture; height: Texture }) {
   const lathe = useMemo(
     () => [
       [0.001, 0], [0.27, 0], [0.3, 0.02], [0.36, 0.2], [0.37, 0.23], [0.35, 0.235], [0.33, 0.21], [0.27, 0.05], [0.001, 0.045],
@@ -208,23 +208,12 @@ export function Toppings({ base, extras }: { base: BaseId | null; extras: Extras
       <EggBase show={base === 'egg'} />
       <VeggieBase show={base === 'veggie'} />
 
-      {LEG_SLOTS.map((s, i) => (
-        <OnRice key={`leg${i}`} {...s} lift={0.05 + i * 0.05} show={extras.chickenLeg > i}>
-          <PhotoFood map={t.leg} height={t.legH} size={1.0} thickness={0.2} roughness={0.32} />
-        </OnRice>
-      ))}
+      {/* chicken legs and house sauce live in Props.tsx: they travel from the side station */}
       {EGG_SLOTS.map((s, i) => (
         <OnRice key={`egg${i}`} {...s} lift={0.03 + i * 0.03} show={extras.egg > i}>
           <PhotoFood map={t.egg} height={t.eggH} size={0.92} thickness={0.06} roughness={0.4} />
         </OnRice>
       ))}
-      {/* first sauce sits in the bowl like the restaurant serves it, a second goes on the table */}
-      <OnRice x={-0.62} z={-0.5} yaw={0} lift={-0.03} show={extras.sauce > 0}>
-        <SauceCup map={t.sauce} height={t.sauceH} />
-      </OnRice>
-      <Pop show={extras.sauce > 1} position={[-1.15 * BOWL_STRETCH - 0.95, 0, 1.05]}>
-        <SauceCup map={t.sauce} height={t.sauceH} />
-      </Pop>
     </group>
   );
 }
