@@ -4,7 +4,7 @@ import { priceOrder } from '../src/order/pricing.ts';
 import { emptyExtras, type Menu, type OrderDraft } from '../src/order/types.ts';
 
 const menu = menuJson as Menu;
-const withDrinkPrices: Menu = { ...menu, drinks: menu.drinks.map((d) => ({ ...d, price: d.id === 'juice' ? 120 : d.price })) };
+const withDrinkPrices: Menu = { ...menu, drinks: menu.drinks.map((d) => ({ ...d, price: d.id === 'mojito' ? 120 : d.price })) };
 
 const draft = (over: Partial<OrderDraft> = {}): OrderDraft => ({
   bowls: [{ base: 'chicken', extras: emptyExtras() }],
@@ -46,13 +46,13 @@ describe('priceOrder', () => {
   });
 
   it('never treats an unpriced drink as free', () => {
-    const r = priceOrder(draft({ drinks: { water: 1 } }), menu);
+    const r = priceOrder(draft({ drinks: { sprite: 1 } }), menu);
     expect(r.errors[0]).toMatch(/no price yet/);
-    expect(r.lines.some((l) => l.label === 'Bottled water')).toBe(false);
+    expect(r.lines.some((l) => l.label === 'Sprite')).toBe(false);
   });
 
   it('adds priced drinks per unit and rejects unknown ones', () => {
-    expect(priceOrder(draft({ drinks: { juice: 2 } }), withDrinkPrices).total).toBe(500 + 240);
+    expect(priceOrder(draft({ drinks: { mojito: 2 } }), withDrinkPrices).total).toBe(500 + 240);
     expect(priceOrder(draft({ drinks: { tej: 1 } }), withDrinkPrices).errors[0]).toMatch(/no longer on the menu/);
   });
 
